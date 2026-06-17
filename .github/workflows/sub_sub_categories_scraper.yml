@@ -41,11 +41,23 @@ jobs:
 
           MULTI_CATEGORIES = {
               "home_appliances":
-                  "https://qatarsale.com/ar/products/home_appliances?basic_search:StatusFilter=0"
+                  "https://qatarsale.com/ar/products/home_appliances?basic_search:StatusFilter=0",
+              "services":
+                  "https://qatarsale.com/ar/products/services?basic_search:StatusFilter=0",
+              "mobile_telephone_and_tablets":
+                  "https://qatarsale.com/ar/products/mobile_telephone_and_tablets?basic_search:StatusFilter=0",
+              "furniture_dcor":
+                  "https://qatarsale.com/ar/products/furniture_dcor?basic_search:StatusFilter=0",
+              "electronics":
+                  "https://qatarsale.com/ar/products/electronics?basic_search:StatusFilter=0"
           }
 
           PAGES_PER_JOB = {
-              "home_appliances": 20
+              "home_appliances":                 3,
+              "services":                        1,
+              "mobile_telephone_and_tablets":    3,
+              "furniture_dcor":                 10,
+              "electronics":                     1
           }
 
           matrix = {"include": []}
@@ -175,6 +187,10 @@ jobs:
       matrix:
         category:
           - home_appliances
+          - services
+          - mobile_telephone_and_tablets
+          - furniture_dcor
+          - electronics
 
     steps:
       - name: Checkout repo

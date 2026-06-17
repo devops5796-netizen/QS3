@@ -10,7 +10,15 @@ load_dotenv()
 
 MULTI_CATEGORIES = {
     "home_appliances":
-        "https://qatarsale.com/ar/products/home_appliances?basic_search:StatusFilter=0"
+        "https://qatarsale.com/ar/products/home_appliances?basic_search:StatusFilter=0",
+    "services":
+        "https://qatarsale.com/ar/products/services?basic_search:StatusFilter=0",
+    "mobile_telephone_and_tablets":
+        "https://qatarsale.com/ar/products/mobile_telephone_and_tablets?basic_search:StatusFilter=0",
+    "furniture_dcor":
+        "https://qatarsale.com/ar/products/furniture_dcor?basic_search:StatusFilter=0",
+    "electronics":
+        "https://qatarsale.com/ar/products/electronics?basic_search:StatusFilter=0"
 }
 
 
