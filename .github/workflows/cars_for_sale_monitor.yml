@@ -1,0 +1,175 @@
+name: Cars For Sale Monitor
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: '0 0 * * 1'
+
+jobs:
+
+  detect_pages:
+
+    runs-on: ubuntu-latest
+
+    outputs:
+      matrix: ${{ steps.build_matrix.outputs.matrix }}
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Detect pages
+        id: build_matrix
+        run: |
+          python << 'EOF'
+
+          import json
+          import math
+          import os
+
+          from cars_for_sale_monitor import get_last_page
+
+          last_page = get_last_page()
+
+          print(f"Detected pages: {last_page}")
+
+          N_JOBS = 20
+
+          pages_per_job = math.ceil(last_page / N_JOBS)
+
+          matrix = {"include": []}
+
+          for i in range(N_JOBS):
+
+              start = i * pages_per_job + 1
+              end = min((i + 1) * pages_per_job, last_page)
+
+              if start > last_page:
+                  break
+
+              matrix["include"].append({
+                  "start": start,
+                  "end": end
+              })
+
+          print(json.dumps(matrix, indent=2))
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"matrix={json.dumps(matrix)}")
+
+          EOF
+
+  scrape:
+
+    needs: detect_pages
+
+    runs-on: ubuntu-latest
+
+    strategy:
+
+      fail-fast: false
+
+      matrix: ${{ fromJson(needs.detect_pages.outputs.matrix) }}
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run scraper
+        run: |
+          python cars_for_sale_monitor.py ${{ matrix.start }} ${{ matrix.end }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitor-${{ matrix.start }}-${{ matrix.end }}
+          path: cars_for_sale_monitor_${{ matrix.start }}_${{ matrix.end }}.csv
+
+  merge:
+
+    needs: scrape
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install pandas boto3
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: monitor-*
+          merge-multiple: true
+          path: csv_parts
+
+      - name: Merge CSVs
+        run: |
+          python << 'EOF'
+
+          import glob
+          import pandas as pd
+
+          files = glob.glob("csv_parts/*.csv")
+
+          dfs = [pd.read_csv(f) for f in files]
+
+          merged = pd.concat(dfs, ignore_index=True)
+
+          merged.drop_duplicates(
+              subset=["product_url"],
+              inplace=True
+          )
+
+          merged.to_csv(
+              "cars_for_sale_monitor.csv",
+              index=False,
+              encoding="utf-8-sig"
+          )
+
+          print(f"Rows: {len(merged)}")
+
+          EOF
+
+      - name: Upload final CSV to Cloudflare R2
+        env:
+          CF_R2_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          CF_R2_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          CF_R2_ENDPOINT_URL: ${{ secrets.CF_R2_ENDPOINT_URL }}
+          CF_R2_BUCKET_NAME: ${{ secrets.CF_R2_BUCKET_NAME }}
+
+        run: |
+          python << 'EOF'
+
+          from r2_upload import upload_csv
+
+          upload_csv("cars_for_sale_monitor.csv")
+
+          EOF
+
+      - name: Upload merged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cars-for-sale-monitor
+          path: cars_for_sale_monitor.csv
