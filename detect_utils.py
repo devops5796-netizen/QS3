@@ -1,59 +1,50 @@
 import json
 from scrapling import StealthyFetcher
 
-def get_subcategories(base_url: str) -> list:
+def get_subcategories_recursive(base_url: str, parent_names: list = []) -> list:
     page = StealthyFetcher.fetch(base_url, headless=True, network_idle=True, timeout=90000)
     subcats = []
-    links = page.find_all("[data-testid^='at-sub-category-']")
     
-    for link in links:
-        testid = link.attrib.get("data-testid", "")
-        idx = testid.replace("at-sub-category-", "")
-        if idx == "0":
-            continue
+    base_path = base_url.split("?")[0].replace("https://qatarsale.com", "")
+    
+    links = page.find_all("[data-testid^='at-sub-category-']")
+    links = [l for l in links if l.attrib.get("data-testid", "").replace("at-sub-category-", "") != "0"]
+    
+    real_children = [l for l in links if l.attrib.get("href", "").startswith(base_path + "-")]
+    
+    if not real_children:
+        return []
+    
+    for link in real_children:
         href = link.attrib.get("href", "").strip()
         if not href:
             continue
         name_el = link.find("p")
         name = name_el.text.strip() if name_el else href.split("-")[-1]
-        full_url = f"https://qatarsale.com{href}" if href.startswith("/") else href
+        full_url = f"https://qatarsale.com{href}"
         slug = href.rstrip("/").split("/")[-1]
-
-        try:
-            sub_page = StealthyFetcher.fetch(
-                full_url,
-                headless=True,
-                network_idle=True,
-                timeout=90000
-            )
-            sub_links = sub_page.find_all("[data-testid^='at-sub-category-']")
-            sub_links = [
-                l for l in sub_links
-                if l.attrib.get("data-testid", "").replace("at-sub-category-", "") != "0"
-            ]
-
-            if sub_links:
-                for sub_link in sub_links:
-                    sub_href = sub_link.attrib.get("href", "").strip()
-                    if not sub_href:
-                        continue
-                    sub_name_el = sub_link.find("p")
-                    sub_name = sub_name_el.text.strip() if sub_name_el else sub_href.split("-")[-1]
-                    sub_full_url = f"https://qatarsale.com{sub_href}" if sub_href.startswith("/") else sub_href
-                    sub_slug = sub_href.rstrip("/").split("/")[-1]
-                    subcats.append({
-                        "name": f"{sub_name} [{name}]",
-                        "slug": sub_slug,
-                        "url":  sub_full_url
-                    })
+        
+        children = get_subcategories_recursive(full_url, parent_names + [name])
+        
+        if children:
+            subcats.extend(children)
+        else:
+            if parent_names:
+                brackets = "".join([f" [{p}]" for p in parent_names])
+                display_name = f"{name}{brackets}"
             else:
-                subcats.append({"name": name, "slug": slug, "url": full_url})
-
-        except Exception as e:
-            print(f"  Failed to check sub-subcats for {name}: {e}")
-            subcats.append({"name": name, "slug": slug, "url": full_url})
-
+                display_name = name
+            subcats.append({
+                "name": display_name,
+                "slug": slug,
+                "url": full_url
+            })
+    
     return subcats
+
+
+def get_subcategories(base_url: str) -> list:
+    return get_subcategories_recursive(base_url)
 
 
 def analyze_category_with_products(url: str):
