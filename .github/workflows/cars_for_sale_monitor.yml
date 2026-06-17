@@ -162,7 +162,7 @@ jobs:
         run: |
           python << 'EOF'
 
-          from r2_upload import upload_csv
+          from r2_uploader import upload_csv
 
           upload_csv("cars_for_sale_monitor.csv")
 
