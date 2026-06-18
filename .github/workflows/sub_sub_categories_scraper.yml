@@ -55,12 +55,12 @@ jobs:
           }
 
           PAGES_PER_JOB = {
-              "home_appliances":                 3,
-              "services":                        3,
-              "mobile_telephone_and_tablets":    3,
-              "furniture_dcor":                 10,
-              "electronics":                     3,
-              "sportswear_equipment"             4
+              "home_appliances":                 20,
+              "services":                        20,
+              "mobile_telephone_and_tablets":    20,
+              "furniture_dcor":                  20,
+              "electronics":                     20,
+              "sportswear_equipment"             20
           }
 
           matrix = {"include": []}
