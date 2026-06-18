@@ -18,7 +18,9 @@ MULTI_CATEGORIES = {
     "furniture_dcor":
         "https://qatarsale.com/ar/products/furniture_dcor?basic_search:StatusFilter=0",
     "electronics":
-        "https://qatarsale.com/ar/products/electronics?basic_search:StatusFilter=0"
+        "https://qatarsale.com/ar/products/electronics?basic_search:StatusFilter=0",
+    "sportswear_equipment":
+        "https://qatarsale.com/ar/products/sportswear_equipment?basic_search:StatusFilter=0"
 }
 
 

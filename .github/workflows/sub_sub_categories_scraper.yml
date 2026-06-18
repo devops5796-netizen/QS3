@@ -49,15 +49,18 @@ jobs:
               "furniture_dcor":
                   "https://qatarsale.com/ar/products/furniture_dcor?basic_search:StatusFilter=0",
               "electronics":
-                  "https://qatarsale.com/ar/products/electronics?basic_search:StatusFilter=0"
+                  "https://qatarsale.com/ar/products/electronics?basic_search:StatusFilter=0",
+              "sportswear_equipment":
+                  "https://qatarsale.com/ar/products/sportswear_equipment?basic_search:StatusFilter=0"
           }
 
           PAGES_PER_JOB = {
               "home_appliances":                 3,
-              "services":                        1,
+              "services":                        3,
               "mobile_telephone_and_tablets":    3,
               "furniture_dcor":                 10,
-              "electronics":                     1
+              "electronics":                     3,
+              "sportswear_equipment"             4
           }
 
           matrix = {"include": []}
@@ -191,6 +194,7 @@ jobs:
           - mobile_telephone_and_tablets
           - furniture_dcor
           - electronics
+          - sportswear_equipment
 
     steps:
       - name: Checkout repo
