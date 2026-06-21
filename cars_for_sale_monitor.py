@@ -18,7 +18,7 @@ def get_last_page():
     if page.status != 200:
         raise Exception(f"HTTP {page.status} on {LISTING_URL}")
 
-    soup = BeautifulSoup(page.content, "html.parser")
+    soup = BeautifulSoup(page.body, "html.parser")
 
     pages = []
     for a in soup.select("a[href*='page=']"):
@@ -43,7 +43,7 @@ def scrape_page(page_num: int, fetcher: StealthyFetcher) -> list:  # ← session
             print(f"Page {page_num}: HTTP {page.status}")
             return []
 
-        soup = BeautifulSoup(page.content, "html.parser")
+        soup = BeautifulSoup(page.body, "html.parser")
         cards = soup.find_all("qs-product-card-v2")
 
         results = []
