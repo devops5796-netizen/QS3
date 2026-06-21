@@ -12,7 +12,7 @@ LISTING_URL = "https://qatarsale.com/ar/products/cars_for_sale?basic_search:Stat
 
 def get_last_page():
 
-    StealthyFetcher.configure(auto_match=False)
+    StealthyFetcher.configure()
     fetcher = StealthyFetcher()
     page = fetcher.fetch(LISTING_URL, timeout=30)
 
@@ -108,7 +108,7 @@ def scrape_page(page_num: int, fetcher: StealthyFetcher) -> list:  # ← session
 
 def run(start_page: int, end_page: int):
 
-    StealthyFetcher.configure(auto_match=False)
+    StealthyFetcher.configure()
     fetcher = StealthyFetcher()
 
     all_results = []
