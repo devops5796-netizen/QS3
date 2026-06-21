@@ -4,41 +4,27 @@ import random
 from datetime import datetime
 
 import pandas as pd
-import requests
 from bs4 import BeautifulSoup
+from scrapling.fetchers import StealthyFetcher
 
 LISTING_URL = "https://qatarsale.com/ar/products/cars_for_sale?basic_search:StatusFilter=0"
 
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/123.0.0.0 Safari/537.36",
-]
 
 def get_last_page():
 
-    session = requests.Session()
+    fetcher = StealthyFetcher(auto_match=False)
+    page = fetcher.fetch(LISTING_URL, timeout=30)
 
-    response = session.get(
-        LISTING_URL,
-        headers={
-            "User-Agent": random.choice(USER_AGENTS)
-        },
-        timeout=30
-    )
+    if page.status != 200:
+        raise Exception(f"HTTP {page.status} on {LISTING_URL}")
 
-    response.raise_for_status()
-
-    soup = BeautifulSoup(response.text, "html.parser")
+    soup = BeautifulSoup(page.content, "html.parser")
 
     pages = []
-
     for a in soup.select("a[href*='page=']"):
-
         href = a.get("href", "")
-
         if "page=" not in href:
             continue
-
         try:
             pages.append(int(href.split("page=")[-1]))
         except ValueError:
@@ -46,21 +32,18 @@ def get_last_page():
 
     return max(pages) if pages else 1
 
-def scrape_page(page_num: int, session: requests.Session) -> list:
+
+def scrape_page(page_num: int, fetcher: StealthyFetcher) -> list:  # ← session → fetcher
     url = f"{LISTING_URL}&page={page_num}"
 
-    headers = {
-        "User-Agent": random.choice(USER_AGENTS)
-    }
-
     try:
-        response = session.get(url, headers=headers, timeout=30)
+        page = fetcher.fetch(url, timeout=30)
 
-        if response.status_code != 200:
-            print(f"Page {page_num}: HTTP {response.status_code}")
+        if page.status != 200:
+            print(f"Page {page_num}: HTTP {page.status}")
             return []
 
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = BeautifulSoup(page.content, "html.parser")
         cards = soup.find_all("qs-product-card-v2")
 
         results = []
@@ -124,18 +107,13 @@ def scrape_page(page_num: int, session: requests.Session) -> list:
 
 def run(start_page: int, end_page: int):
 
-    session = requests.Session()
+    fetcher = StealthyFetcher(auto_match=False)
 
     all_results = []
 
-    print(f"\nProcessing pages {start_page} -> {end_page}\n")
-
     for page_num in range(start_page, end_page + 1):
-
-        results = scrape_page(page_num, session)
-
+        results = scrape_page(page_num, fetcher)  
         all_results.extend(results)
-
         if page_num < end_page:
             time.sleep(random.uniform(2, 4))
 
@@ -162,8 +140,6 @@ def run(start_page: int, end_page: int):
 
 
 if __name__ == "__main__":
-
     start_page = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     end_page = int(sys.argv[2]) if len(sys.argv) > 2 else 5
-
     run(start_page, end_page)
