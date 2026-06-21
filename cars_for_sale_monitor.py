@@ -13,7 +13,7 @@ LISTING_URL = "https://qatarsale.com/ar/products/cars_for_sale?basic_search:Stat
 def get_last_page():
 
     fetcher = StealthyFetcher()
-    page = fetcher.fetch(LISTING_URL, timeout=30)
+    page = fetcher.fetch(LISTING_URL, timeout=30000)
 
     if page.status != 200:
         raise Exception(f"HTTP {page.status} on {LISTING_URL}")
@@ -37,7 +37,7 @@ def scrape_page(page_num: int, fetcher: StealthyFetcher) -> list:  # ← session
     url = f"{LISTING_URL}&page={page_num}"
 
     try:
-        page = fetcher.fetch(url, timeout=30)
+        page = fetcher.fetch(LISTING_URL, timeout=30000)
 
         if page.status != 200:
             print(f"Page {page_num}: HTTP {page.status}")
