@@ -37,7 +37,7 @@ def scrape_page(page_num: int, fetcher: StealthyFetcher) -> list:  # ← session
     url = f"{LISTING_URL}&page={page_num}"
 
     try:
-        page = fetcher.fetch(LISTING_URL, timeout=30000)
+        page = fetcher.fetch(url, timeout=30000)
 
         if page.status != 200:
             print(f"Page {page_num}: HTTP {page.status}")
