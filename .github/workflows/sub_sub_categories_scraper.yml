@@ -1,13 +1,16 @@
 name: QatarSale Sub Sub Categories Scraper
 
 on:
-  schedule:
-    - cron: '0 2 * * *'
+  workflow_run:
+    workflows: ["Cars For Sale Monitor"]
+    types:
+      - completed
   workflow_dispatch:
 
 jobs:
   detect_subcats:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     outputs:
       matrix: ${{ steps.build_matrix.outputs.matrix }}
 
@@ -314,4 +317,12 @@ jobs:
               ExtraArgs={'ContentType': 'text/plain; charset=utf-8'})
           print(f"Failed URLs uploaded: {base_key}/failed_urls.txt")
           EOF
+
+      - name: Trigger Categories workflow
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/devops5796-netizen/QS4/dispatches \
+            -d '{"event_type": "sub_sub_categories-done"}'
   

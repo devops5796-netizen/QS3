@@ -1,10 +1,9 @@
 name: Cars For Sale Monitor
 
 on:
+  repository_dispatch:
+    types: [sub_categories-done]
   workflow_dispatch:
-
-  schedule:
-    - cron: '0 0 * * 1'
 
 jobs:
 
