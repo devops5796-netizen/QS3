@@ -2,7 +2,7 @@ import json
 import os
 import pandas as pd
 
-def run(input_json: str, output_csv: str):
+def run(input_json: str):
     print("\n" + "="*50)
     print("STEP 3: Flattening specifications JSON...")
     print("="*50)
@@ -28,6 +28,5 @@ def run(input_json: str, output_csv: str):
         df["specifications"].apply(lambda x: x if isinstance(x, dict) else {})
     )
     df = pd.concat([df, specs_expanded], axis=1)
-    df.to_csv(output_csv, index=False, encoding="utf-8-sig")
-    print(f"STEP 3 DONE: Saved to '{output_csv}' with {len(df.columns)} columns")
-    return {"columns": len(df.columns)}
+    df = pd.concat([df, specs_expanded], axis=1)
+    return {"columns": len(df.columns), "df": df} 
