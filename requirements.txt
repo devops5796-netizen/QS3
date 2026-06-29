@@ -9,4 +9,3 @@ boto3
 Pillow
 curl_cffi
 browserforge
-scrapling

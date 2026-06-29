@@ -17,38 +17,6 @@ if CF_R2_ENDPOINT_URL:
     CLEAN_ENDPOINT = CF_R2_ENDPOINT_URL.rstrip("/").removesuffix("/" + BUCKET_NAME)
 
 
-def upload_csv(local_file):
-    client = boto3.client(
-        "s3",
-        endpoint_url= CLEAN_ENDPOINT,
-        aws_access_key_id= CF_R2_ACCESS_KEY,
-        aws_secret_access_key= CF_R2_SECRET_KEY,
-        region_name="auto",
-    )
-
-    bucket = BUCKET_NAME
-
-    dt = datetime.now()
-
-    key = (
-        f"qatarsale/"
-        f"{dt.year}/"
-        f"{dt.strftime('%B').lower()}/"
-        f"{dt.day}/"
-        f"cars_for_sale_monitor.csv"
-    )
-
-    client.upload_file(
-        local_file,
-        bucket,
-        key,
-        ExtraArgs={
-            "ContentType": "text/csv"
-        },
-    )
-
-    print(f"Uploaded to R2 -> {key}")
-    
 def get_r2_client():
     if CF_R2_ACCESS_KEY and CF_R2_SECRET_KEY and CLEAN_ENDPOINT:
         try:
