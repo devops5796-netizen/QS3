@@ -230,6 +230,39 @@ jobs:
 
           if not files:
               print(f"No Excel files found for {category}")
+              dt = datetime.now()
+              
+              # Empty Excel
+              output_file = f"{category}.xlsx"
+              pd.DataFrame().to_excel(output_file, index=False)
+
+              # Summary with NO DATA
+              summary_file = f"scrape_summary_{category}.txt"
+              with open(summary_file, 'w', encoding='utf-8') as f:
+                  f.write(f"=== {category} ===\n")
+                  f.write(f"Run Date: {dt.strftime('%Y-%m-%d %H:%M:%S')} UTC\n")
+                  f.write(f"Status: NO DATA\n")
+                  f.write(f"Total Sheets: 0\n")
+                  f.write(f"Total Rows: 0\n")
+
+              # Upload both to R2
+              client = boto3.client('s3',
+                  endpoint_url=os.environ['CF_R2_ENDPOINT_URL'],
+                  aws_access_key_id=os.environ['CF_R2_ACCESS_KEY_ID'],
+                  aws_secret_access_key=os.environ['CF_R2_SECRET_ACCESS_KEY'],
+                  region_name='auto'
+              )
+              bucket = os.environ['CF_R2_BUCKET_NAME']
+
+              client.upload_file(output_file, bucket,
+                  f"qatarsale/year={dt.year}/month={dt.strftime('%m')}/day={dt.strftime('%d')}/{category}/excel/{category}.xlsx",
+                  ExtraArgs={'ContentType': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
+
+              client.upload_file(summary_file, bucket,
+                  f"qatarsale/year={dt.year}/month={dt.strftime('%m')}/day={dt.strftime('%d')}/{category}/summary/scrape_summary.txt",
+                  ExtraArgs={'ContentType': 'text/plain; charset=utf-8'})
+
+              print(f"Uploaded empty placeholder files for {category}")
               exit(0)
 
           dfs = [pd.read_excel(f) for f in files]
