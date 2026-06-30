@@ -344,7 +344,7 @@ jobs:
                       if line.startswith('http'):
                           failed.append(line)
 
-          successful = sum(len(df) for df in all_sheets.values())
+          successful = total
 
           total_scraped = successful + len(failed)
 
