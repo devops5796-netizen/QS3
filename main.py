@@ -112,7 +112,16 @@ def run_single_category(category: str, start: int, end: int):
         minutes = int(elapsed // 60)
         seconds = int(elapsed % 60)
 
+        print("\n" + "="*60)
+        print("FINAL SUMMARY")
+        print("="*60)
+        print(f"STEP 1   - Links:    {s1['success']} pages OK | {s1['failed']} failed | {s1['total_links']} total")
+        print(f"STEP 1.5 - Filter:   0 yesterday / {s_filter['total']} total")
+        print("STEP 2   - Products: Skipped")
+        print("STEP 3   - Flatten:  Skipped")
         print(f"Total Time: {minutes}m {seconds}s")
+        print("="*60)
+
         return
 
     s2 = products_scraper.run(filtered_csv, products_json, workers=4, category=category)
