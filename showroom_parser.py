@@ -1,6 +1,11 @@
+import json
+import random
+import time
+import pandas as pd
 from scrapling import StealthyFetcher
 
 BASE_URL = "https://qatarsale.com"
+BASE_PRODUCT_URL = "https://qatarsale.com/ar/product"
 
 
 # -------------------------
@@ -60,37 +65,65 @@ def parse_showroom_details(page, url: str) -> dict:
 # -------------------------
 # PAGES COUNT (IMPORTANT FIX)
 # -------------------------
-def get_max_pages(page):
-    pages = page.css("ul li.numbers a[href*='page=']")
-    nums = []
+def get_max_pages(page, url):
+    try:
+        script = page.find("script", {"id": "serverApp-state"})
+        if not script:
+            return []
 
-    for p in pages:
-        href = p.attrib.get("href", "")
-        if "page=" in href:
-            try:
-                nums.append(int(href.split("page=")[-1]))
-            except:
-                pass
+        raw = (script.text
+               .replace("&q;", '"')
+               .replace("&l;", "<")
+               .replace("&g;", ">")
+               .replace("&a;", "&")
+               .replace("&s;", "'"))
 
-    return max(nums) if nums else 1
+        data = json.loads(raw)
 
+        pagesCount = data["ProductList"]['pagesCount']
+
+    except Exception as e:
+        print(f"❌ Error: {url} -> {e}")
+
+    return pagesCount
 
 # -------------------------
 # PRODUCT LINKS ONLY
 # -------------------------
-def extract_product_links(page):
-    links = []
-    
-    items = page.css("qs-product-card-v2 a[href*='/product/']")
-    
-    for it in items:
-        href = it.attrib.get("href", "")
-        if href:
-            if href.startswith("/"):
-                href = BASE_URL + href
-            links.append(href)
-    
-    return list(set(links))
+def extract_product_links(page, source_url: str):
+    rows = []
+    try:
+        script = page.find("script", {"id": "serverApp-state"})
+        if not script:
+            return []
+
+        raw = (script.text
+               .replace("&q;", '"')
+               .replace("&l;", "<")
+               .replace("&g;", ">")
+               .replace("&a;", "&")
+               .replace("&s;", "'"))
+
+        data = json.loads(raw)
+
+        if "ProductList" not in data:
+            return []
+
+        products  = data["ProductList"]["list"]
+        defs_meta = {str(d["id"]): d["label"] for d in data["ProductList"].get("defsMetaData", [])}
+
+        for product in products:
+            specs = {defs_meta[k]: v for k, v in product.get("definitions", {}).items() if k in defs_meta}
+            row   = {k: v for k, v in product.items() if k != "definitions"}
+            row.update(specs)
+            row["source_url"]  = source_url
+            row["product_url"] = f"{BASE_PRODUCT_URL}/{product.get('uri', '')}" if product.get("uri") else ""
+            rows.append(row)
+
+    except Exception as e:
+        print(f"  Error parsing state: {e}")
+
+    return rows
 
 
 # -------------------------
@@ -112,32 +145,52 @@ def scrape_showroom(showroom_url):
         return {}, []
     
     details = parse_showroom_details(page, showroom_url)
-    max_pages = get_max_pages(page)
+    max_pages = get_max_pages(page, showroom_url)
     print(f"Pages: {max_pages}")
 
-    all_products = set(extract_product_links(page))
-    print(f"  Page 1: {len(all_products)} products")
+    all_rows     = []
+    failed_pages = {}
+    success_count = 0
 
-    for p in range(2, max_pages + 1):
+    for p in range(1, max_pages + 1):
         url = f"{showroom_url}?page={p}"
-        try:
-            pg = StealthyFetcher.fetch(
-                url,
-                headless=True,
-                network_idle=True,
-                timeout=60000,
-                wait_for_idle_network_timeout=10000
-            )
-            links = extract_product_links(pg)
-            print(f"  Page {p}: {len(links)} products")
-            all_products.update(links)
-        except Exception as e:
-            print(f"  [ERROR] Page {p}: {e}")
-            continue
 
-    product_list = list(all_products)
+        for attempt in range(3):
+            try:
+                pg = StealthyFetcher.fetch(
+                    url,
+                    headless=True,
+                    network_idle=True,
+                    timeout=60000,
+                    wait_for_idle_network_timeout=10000
+                )
+                rows = extract_product_links(pg, showroom_url)
 
-    if not product_list:
-        print(f"  [INFO] No products found in {showroom_url}")
+                if rows:
+                    all_rows.extend(rows)
+                    print(f"  ✓ Found {len(rows)} products")
+                    success_count += 1
+                    break
+                else:
+                    failed_pages[f"Page {p}"] = "No products found"
+                    print(f"  ⚠ No products found")
+                    break
 
-    return details, product_list
+            except Exception as e:
+                if attempt < 2:
+                    print(f"  Attempt {attempt+1} failed, retrying...")
+                    time.sleep(3)
+                else:
+                    failed_pages[f"Page {p}"] = str(e)
+                    print(f"  Error: {e}")
+
+        if p < max_pages:
+            time.sleep(random.uniform(1.0, 3.0))
+    
+    all_products_df = pd.DataFrame(all_rows)
+
+    # deduplicate
+    if "product_url" in all_products_df.columns:
+        all_products_df = all_products_df.drop_duplicates(subset=["product_url"], keep="first")
+
+    return details, all_products_df

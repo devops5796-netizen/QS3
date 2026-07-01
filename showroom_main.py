@@ -1,33 +1,57 @@
 import sys
 import time
 import pandas as pd
-
-import showroom_links_scraper
 import showroom_parser
 import products_scraper
 import flatten
 import excel_writer
 from products_scraper import download_images
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 load_dotenv()
 
+def filter_yesterday_links(links_csv: str, filtered_csv: str) -> dict:
+    df = pd.read_csv(links_csv)
+    
+    if "startDate" not in df.columns:
+        print("⚠️ No startDate column found, using all links")
+        df.to_csv(filtered_csv, index=False, encoding="utf-8")
+        return {"total": len(df), "yesterday": len(df)}
+
+    df["date_parsed"] = pd.to_datetime(df["startDate"], format="ISO8601", utc=True)
+    yesterday = datetime.now(timezone.utc).date() - timedelta(days=1)
+    mask = df["date_parsed"].dt.date == yesterday
+    df_yesterday = df[mask].drop(columns=["date_parsed"])
+
+    print(f"  Total links:     {len(df)}")
+    print(f"  Yesterday links: {len(df_yesterday)}")
+
+    df_yesterday.to_csv(filtered_csv, index=False, encoding="utf-8")
+    return {"total": len(df), "yesterday": len(df_yesterday)}
 
 def process_showroom(url, jsonl_file, category_key: str):
     slug = url.split("/ar/showroom/")[-1].split("/")[0] if "/ar/showroom/" in url else "showroom"
 
     for attempt in range(3):
         try:
-            details, product_links = showroom_parser.scrape_showroom(url)
+            details, product_df = showroom_parser.scrape_showroom(url)
 
-            if not product_links:
+            if product_df is None or product_df.empty:
                 print(f"  [EMPTY] No products in {slug}")
                 return None, "empty"
 
             tmp_csv = f"tmp_{slug}.csv"
-            pd.DataFrame({"product_url": product_links}).to_csv(tmp_csv, index=False)
+            product_df.to_csv(tmp_csv, index=False)
+
+            tmp_csv_filtered = f"tmp_filtered_{slug}.csv"
+
+            product_df_filter   = filter_yesterday_links(tmp_csv, tmp_csv_filtered)
+            if product_df_filter["yesterday"] == 0:
+                print("No listings found for yesterday.")
+                return None, "empty"
 
             products_scraper.run(
-                links_csv=tmp_csv,
+                links_csv=tmp_csv_filtered,
                 output_json=jsonl_file,
                 workers=6,
                 category=f"showrooms_{category_key}"
