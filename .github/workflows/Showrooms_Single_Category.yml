@@ -165,13 +165,13 @@ jobs:
           from datetime import datetime
 
           category = os.environ["CATEGORY"]                        # cars_for_sale | cars_for_rent
-          r2_base  = f"showrooms/showrooms_{category}"             # e.g. showrooms/showrooms_cars_for_sale
-
+          dt = datetime.now()
+          base_path = f"qatarsale/year={dt.year}/month={dt.strftime('%m')}/day={dt.strftime('%d')}/showrooms_{category}"
+          
           excel_files  = glob.glob("showroom_parts/showroom_*.xlsx")
           failed_files = glob.glob("showroom_parts/*_failed.txt")
           print(f"Found {len(excel_files)} Excel files, {len(failed_files)} failed files")
 
-          dt     = datetime.utcnow()
           bucket = os.environ["CF_R2_BUCKET_NAME"]
           client = boto3.client(
               "s3",
@@ -248,12 +248,13 @@ jobs:
           print(f"[{category}] Total records: {len(all_data)}")
 
           # ── upload merged Excel ──────────────────────────────────────────
+          excel_key = f"{base_path}/excel/all_showrooms.xlsx"
           client.upload_file(
               "all_showrooms.xlsx", bucket,
-              f"{r2_base}/excel/all_showrooms.xlsx",
+              excel_key,
               ExtraArgs={"ContentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
           )
-          print(f"✅ Uploaded: {r2_base}/excel/all_showrooms.xlsx")
+          print(f"✅ Uploaded: {excel_key}")
 
           # ── NEW: Save and upload JSON matching the Excel ────────────────
           json_file = "all_showrooms.json"
@@ -261,12 +262,13 @@ jobs:
               json.dump(all_data, f, ensure_ascii=False, indent=2)
           print(f"   JSON saved: {json_file} ({len(all_data)} records)")
 
+          json_key = f"{base_path}/json/all_showrooms.json"
           client.upload_file(
               json_file, bucket,
-              f"{r2_base}/json/all_showrooms.json",
+              json_key,
               ExtraArgs={"ContentType": "application/json; charset=utf-8"},
           )
-          print(f"✅ Uploaded: {r2_base}/json/all_showrooms.json")
+          print(f"✅ Uploaded: {json_key}")
 
           # ── summary ──────────────────────────────────────────────────────
           with open("scrape_summary.txt", "w", encoding="utf-8") as f:
@@ -294,25 +296,27 @@ jobs:
                   for s in failed_showrooms:
                       f.write(f"  {s}\n")
 
+          summary_key = f"{base_path}/summary/scrape_summary.txt"
           client.upload_file(
               "scrape_summary.txt", bucket,
-              f"{r2_base}/summary/scrape_summary.txt",
+              summary_key,
               ExtraArgs={"ContentType": "text/plain; charset=utf-8"},
           )
-          print(f"✅ Uploaded: {r2_base}/summary/scrape_summary.txt")
+          print(f"✅ Uploaded: {summary_key}")
 
           # ── failed URLs ──────────────────────────────────────────────────
           with open("failed_urls.txt", "w", encoding="utf-8") as f:
               f.write(f"Total Failed URLs: {len(all_failed_urls)}\n\n")
               for u in all_failed_urls:
                   f.write(u + "\n")
-
+          
+          failed_key = f"{base_path}/summary/failed_urls.txt"
           client.upload_file(
               "failed_urls.txt", bucket,
-              f"{r2_base}/summary/failed_urls.txt",
+              failed_key,
               ExtraArgs={"ContentType": "text/plain; charset=utf-8"},
           )
-          print(f"✅ Uploaded: {r2_base}/summary/failed_urls.txt")
+          print(f"✅ Uploaded: {failed_key}")
 
           print("\nDone! ✅")
           EOF
