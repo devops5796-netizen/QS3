@@ -161,7 +161,7 @@ jobs:
         run: |
           python << 'EOF'
           import pandas as pd
-          import glob, os, boto3
+          import glob, os, boto3, json
           from datetime import datetime
 
           category = os.environ["CATEGORY"]                        # cars_for_sale | cars_for_rent
@@ -197,6 +197,7 @@ jobs:
           success_sheets   = []
           empty_showrooms  = []
           failed_showrooms = []
+          all_data = [] 
 
           with pd.ExcelWriter("all_showrooms.xlsx", engine="openpyxl") as writer:
               for f in excel_files:
@@ -228,6 +229,12 @@ jobs:
                       success_sheets.append({"name": sheet_name, "rows": len(df)})
                       print(f"  ✓ {sheet_name}: {len(df)} rows")
 
+                      sheet_data = df.to_dict(orient='records')
+                      # Add showroom name to each record
+                      for record in sheet_data:
+                          record['showroom'] = sheet_name
+                      all_data.extend(sheet_data)
+
                   except Exception as e:
                       sheet_name = os.path.basename(f).replace("showroom_", "").replace(".xlsx", "")[:31]
                       failed_showrooms.append(sheet_name)
@@ -238,6 +245,7 @@ jobs:
           print(f"[{category}] Empty:        {len(empty_showrooms)}")
           print(f"[{category}] Failed read:  {len(failed_showrooms)}")
           print(f"[{category}] Failed URLs:  {len(all_failed_urls)}")
+          print(f"[{category}] Total records: {len(all_data)}")
 
           # ── upload merged Excel ──────────────────────────────────────────
           client.upload_file(
@@ -247,6 +255,19 @@ jobs:
           )
           print(f"✅ Uploaded: {r2_base}/excel/all_showrooms.xlsx")
 
+          # ── NEW: Save and upload JSON matching the Excel ────────────────
+          json_file = "all_showrooms.json"
+          with open(json_file, 'w', encoding='utf-8') as f:
+              json.dump(all_data, f, ensure_ascii=False, indent=2)
+          print(f"   JSON saved: {json_file} ({len(all_data)} records)")
+
+          client.upload_file(
+              json_file, bucket,
+              f"{r2_base}/json/all_showrooms.json",
+              ExtraArgs={"ContentType": "application/json; charset=utf-8"},
+          )
+          print(f"✅ Uploaded: {r2_base}/json/all_showrooms.json")
+
           # ── summary ──────────────────────────────────────────────────────
           with open("scrape_summary.txt", "w", encoding="utf-8") as f:
               f.write(f"=== showrooms_{category} ===\n")
@@ -255,6 +276,7 @@ jobs:
               f.write(f"Excel Files Found:   {len(excel_files)}\n")
               f.write(f"Success:             {len(success_sheets)}\n")
               f.write(f"Empty:               {len(empty_showrooms)}\n")
+              f.write(f"Total Records:       {len(all_data)}\n\n")
               f.write(f"Failed to Read:      {len(failed_showrooms)}\n")
               f.write(f"Failed Product URLs: {len(all_failed_urls)}\n\n")
 

@@ -221,7 +221,7 @@ jobs:
         run: |
           python << 'EOF'
           import pandas as pd
-          import glob, os, boto3, subprocess
+          import glob, os, boto3, subprocess, json
           from datetime import datetime
           from r2_uploader import upload_final_batch_assets
 
@@ -235,6 +235,11 @@ jobs:
               # Empty Excel
               output_file = f"{category}.xlsx"
               pd.DataFrame().to_excel(output_file, index=False)
+
+              # Empty JSON (matching the empty Excel)
+              json_file = f"{category}.json"
+              with open(json_file, 'w', encoding='utf-8') as f:
+                  json.dump([], f, ensure_ascii=False, indent=2)
 
               # Summary with NO DATA
               summary_file = f"scrape_summary_{category}.txt"
@@ -257,6 +262,10 @@ jobs:
               client.upload_file(output_file, bucket,
                   f"qatarsale/year={dt.year}/month={dt.strftime('%m')}/day={dt.strftime('%d')}/{category}/excel/{category}.xlsx",
                   ExtraArgs={'ContentType': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
+
+              client.upload_file(json_file, bucket,
+                  f"qatarsale/year={dt.year}/month={dt.strftime('%m')}/day={dt.strftime('%d')}/{category}/json/{category}.json",
+                  ExtraArgs={'ContentType': 'application/json; charset=utf-8'})
 
               client.upload_file(summary_file, bucket,
                   f"qatarsale/year={dt.year}/month={dt.strftime('%m')}/day={dt.strftime('%d')}/{category}/summary/scrape_summary.txt",
@@ -284,6 +293,19 @@ jobs:
           )
           print(f"Upload result: {result}")
 
+          # ── Save JSON (matching Excel) ──
+          json_file = f"{category}.json"
+          json_data = merged.to_dict(orient='records')
+          with open(json_file, 'w', encoding='utf-8') as f:
+              json.dump(json_data, f, ensure_ascii=False, indent=2)
+          print(f"JSON saved: {json_file} ({len(json_data)} records)")
+
+          # ── Upload JSON ──
+          json_key = f"qatarsale/year={dt.year}/month={dt.strftime('%m')}/day={dt.strftime('%d')}/{category}/json/{category}.json"
+          client.upload_file(json_file, bucket, json_key,
+              ExtraArgs={'ContentType': 'application/json; charset=utf-8'})
+          print(f"JSON uploaded: {json_key}")
+
           dt = datetime.now()
           client = boto3.client('s3',
               endpoint_url=os.environ['CF_R2_ENDPOINT_URL'],
@@ -300,11 +322,25 @@ jobs:
               subprocess.run(["python", "split_by_manufacturer.py", output_file, f"excel_by_manufacturer_{category}"], check=True)
 
               prefix = f"qatarsale/year={dt.year}/month={dt.strftime('%m')}/day={dt.strftime('%d')}/{category}/excel/by_manufacturer"
+              json_prefix = f"qatarsale/year={dt.year}/month={dt.strftime('%m')}/day={dt.strftime('%d')}/{category}/json/by_manufacturer"
               for f in glob.glob(f"excel_by_manufacturer_{category}/*.xlsx"):
                   key = f"{prefix}/{os.path.basename(f)}"
                   client.upload_file(f, bucket, key,
                       ExtraArgs={'ContentType': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
                   print(f"Uploaded: {key}")
+
+                  # Convert each Excel to JSON and upload
+                  df_split = pd.read_excel(f)
+                  json_split_file = f"{os.path.splitext(f)[0]}.json"
+                  df_split.to_dict(orient='records')
+                  with open(json_split_file, 'w', encoding='utf-8') as jf:
+                      json.dump(df_split.to_dict(orient='records'), jf, ensure_ascii=False, indent=2)
+                  
+                  json_key = f"{json_prefix}/{os.path.basename(json_split_file)}"
+                  client.upload_file(json_split_file, bucket, json_key,
+                      ExtraArgs={'ContentType': 'application/json; charset=utf-8'})
+                  print(f"Uploaded JSON: {json_key}")
+
 
           # Summary
           summary_file = f"scrape_summary_{category}.txt"
@@ -461,7 +497,16 @@ jobs:
                   "status_change": status
               })
 
-          monitor_df = pd.DataFrame(rows)
+          monitor_df = pd.DataFrame(
+              rows,
+              columns=[
+                  "id",
+                  "product_url",
+                  "isSold",
+                  "isExpired",
+                  "status_change",
+              ]
+          )
 
           # ── Save locally ──
           os.makedirs(category, exist_ok=True)
